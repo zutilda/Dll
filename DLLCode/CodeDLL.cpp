@@ -1,5 +1,7 @@
+#define _CRT_SECURE_NO_WARNINGS
 #include <Windows.h>
 #include <malloc.h>
+#include <time.h>
 
 BOOL WINAPI DllMain(HINSTANCE hlnstDll, DWORD dwReason, LPVOID IpReserved)
 {
@@ -20,17 +22,27 @@ BOOL WINAPI DllMain(HINSTANCE hlnstDll, DWORD dwReason, LPVOID IpReserved)
 	else
 		return FALSE;
 }
-extern __declspec(dllimport) DWORD Count(DWORD*);
 
-DWORD Count(DWORD* n)
+HANDLE* threads = NULL;
+int d = 0;
+int* arr = 0;
+int countThread = 0;
+CRITICAL_SECTION section = { 0 };
+
+extern __declspec(dllimport) int Count(int*);
+
+int Count(int* n)
 {	
+	InitializeCriticalSection(&section);
+	EnterCriticalSection(&section);
 	if ((n[0] > 1) && (n[1] > n[0]))
 	{
-		DWORD  d = 0;	
+		arr = calloc(2, sizeof(int));
+		
 		for (n[0]; n[0] <= n[1]; n[0]++)
 		{ 
-			DWORD  k = 0;
-			for (DWORD i = 2; i < n[0]; i++)
+			int  k = 0;
+			for (int i = 2; i < n[0]; i++)
 			{
 				if (n[0] % i == 0) k++;
 				else k+=0;
@@ -38,71 +50,45 @@ DWORD Count(DWORD* n)
 			if (k == 0) d++;
 			else d += 0;
 		}
-		return d;
+		LeaveCriticalSection(&section);
+		DeleteCriticalSection(&section);
+		if (threads != NULL)
+		{
+			for (int i = 0; i < countThread; i++)
+			{
+				ExitThread(0);
+			}
+		}
+		else
+		{
+			arr[0] = d;
+			arr[1] = clock();
+			return arr;
+		}
 	}
 	else
 		return 0;
 }
 
-extern __declspec(dllimport) DWORD Threads(DWORD*, DWORD);
+extern __declspec(dllimport) int Threads(int*, int);
 
-DWORD Threads(DWORD* n, DWORD countTreads)
+int Threads(int* n, int countTreads)
 {
-	if ((n[0] > 1) && (n[1] > n[0]))
-	{
-		DWORD diff = n[1] - n[0];
-
-		if(diff < countTreads) return 0;
-
-		HANDLE* threads;
-		DWORD** n;
-		n = calloc(2, sizeof(DWORD*));
-		DWORD* n1 = n[0], n2 = n[1];
-
-		threads = calloc(countTreads, sizeof(HANDLE));
-
-		for (size_t i = 0; i < countTreads; i++)
+	
+		threads = calloc(sizeof(HANDLE), countTreads);
+		countThread = countTreads;
+		DWORD Thread;
+		InitializeCriticalSection(&section);
+		for (int i = 0; i < countThread; i++)
 		{
-			*n[0] = n1;
-			n1 += 1;
-			*(n[1] + i) = n1;
-
-			*(threads + i) = CreateThread(NULL, NULL, Count(*n), *(n[1] + i), NULL, NULL);
-			n1++;
+			threads[i] = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)Count, n, 0, &Thread);
 		}
+		WaitForMultipleObjects(1, threads, TRUE, INFINITE);
 
-		**(n + countTreads - 1) = n1;
-		*(*(n + countTreads - 1) + 1) = n1;
+		arr[0] = d;
+		arr[1] = clock();
 
-		*(threads + countTreads - 1) = CreateThread(NULL, NULL, Count(*n), *(n + countTreads - 1), NULL, NULL);
-		WaitForMultipleObjects(countTreads, threads, TRUE, INFINITE);
+		return arr;
+	
 
-		DWORD count = 0;
-
-		for (size_t i = 0; i < countTreads + 1; i++)
-		{
-			DWORD code;
-			GetExitCodeThread(threads[i], &code);
-			CloseHandle(threads[i]);
-			count += code;
-		}
-
-		free(n);
-		free(threads);
-
-		return count;
-	}
-	else return 0;
 }
-//extern "C" __declspec(dllimport) int Hello(LPWSTR str);
-//int Hello(LPWSTR str)
-//{
-//	MessageBox(NULL, str, L"Проверка связи", MB_OK);
-//	return 0;
-//}
-//
-//extern "C" __declspec(dllimport) int Sum(int a, int b);
-//int Sum(int a, int b)
-//{
-//	return a + b;
-//}
